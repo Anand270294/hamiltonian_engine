@@ -58,8 +58,6 @@ class max_cut:
             self.mx_ham.generalXMixer(betas, self.p, phse_map,True)
 
             self.circuit = self.phse_ham / self.mx_ham
-
-            return self.circuit.draw(output='mpl')
     
     def run_circuit(self, shots=1024):
         # Add backend for actual quantum chip
