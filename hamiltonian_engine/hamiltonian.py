@@ -9,15 +9,90 @@ os.path.sys.path.append('../hamiltonian_engine/')
 from utils import circuit_builder as cir_build
 
 class hamiltonian:
+    """
+    A Parent class that aids with generating Quantum Alternating Operator Ansatz Circuit 
 
-    # Symbols for converting objective function into Pauli expressions
+    This abstract class is meant to hold symbols that is meant to generate the cost/phase hamiltonians, allow for overloaded operations
+    between various hamiltonians and other data types. This class is not meant to be instantiated directly buy via the other 2
+    hamiltonian classes, certain functions is this class may be specific to only a certain child hamiltonian class.
+
+    ...
+
+    Attributes
+    ----------
+    expression_str : str
+        expression of classical objective function that is not symbolic
+    var : list 
+        list of variables in the classical objective function
+
+    X : dict 
+        X gates based on the number of variables
+    Y : dict
+        Y gates based on the number of variables
+    Z : dict 
+        Z gates based on the number of variables
+
+    constants : list 
+        list of constants; symbols that are not in the variable list
+    
+    symbolic_map : dict
+        dict that is used to map variables in to a Pauli Expression
+    
+    qubit_map : dict
+        dict that holds how qubits are mapped to vertices/variables
+
+    quanCir_list : list
+        Monomial list of all Z interactions between qubits
+    
+    quantum_circuit : list
+        list of generated quantum circuit based on the hamiltonian and length = P-steps
+    
+    obj_exp : str
+        symbolic expression of the classical objective function
+    
+    Hamil_exp : str
+        symbolic expression of phase hamiltonian
+    
+    full_hamiltonian : str
+        symbolic expression of phase hamiltonian that has all zz/z expression
+
+
+    Methods
+    -------
+
+    get_objFun()
+        returns the classical objective function 
+    
+    get_pHamil()
+        returns the symbolic phase hamiltonian
+
+    get_qclist()
+        returns the quanCir_list
+    
+    get_exprstr()
+        returns the expression_str
+    
+    get_variables()
+        returns the list of variables
+
+    get_qubitMap()
+        returns qubit_map
+
+    get_quantumCircuitAslist()
+        returns quantum_circuit
+    
+    get_quantumCircuit()
+        returns a combined circuit of all the circuits in the quantum_circuit list
+    """
+
+    # Symbolic Attributes
     X = {}
     Y = {}
     Z = {}
     constants = []
     symbolic_map = {}
 
-    # Meta data for circuit generations
+    # Meta data for circuit generation
     quanCir_list = []
     qubit_map = None
 
@@ -31,6 +106,15 @@ class hamiltonian:
 
 
     def __init__(self, expr_str, var):
+        """
+        Parameters
+        ----------
+        expr_str : str
+            Classical Objective function as string
+        var : list
+            list of variables present in expr_str
+        """
+
         if expr_str != None:
 
             self.__checkVariables(expr_str, var)
@@ -107,7 +191,6 @@ class hamiltonian:
                     cirq = cirq + temp1 + temp2
         return cirq
 
-    # Need to check more cases so as to prevent future errors
     def __checkVariables(self, expression: str, variables: list):
         for v in variables:
             if(v in expression):
@@ -152,10 +235,43 @@ class hamiltonian:
 
 
 class phase_hamiltonian(hamiltonian):
+    """
+    Child class of hamiltonian, phase hamiltonian generates the PauliSum symbolically and generates the quantum circuit.Users
+    use this class to instantiate the class.
+
+    Methods
+    -------
+    Hamify(pwr_args=True, boolean=False)
+        generates the Pauli Sum expression using SymPy symbols
+    
+    perDitMap(gamma, p, k_dits, graph: nx.Graph, sub_expr={'i': 'i'}, barrier=False, initial_Hadamard=False)
+        maps the each variable/vertex to dits(multiple qubits) used for problems that require order and sequence
+    
+    perQubitMap(gamma, p, barrier=False, initial_Hadamard=False)
+        maps each variable to a single qubit; number of variables = number of qubits
+
+    perEdgeMap(gamma:list, p:int, graph:nx.Graph,  barrier=False, initial_Hadamard=False)
+        maps qubits based on the graph provided by the user
+    """
+
     def __init__(self, expr_str:str, var):
         super().__init__(expr_str, var)
 
     def Hamify(self, pwr_args=True, boolean=False):
+        """ Converts the objective expression that was made symbolic by the parent class into a Z/ZZ Pauli expression
+
+        This methods follows a few rules that would correctly map the variables to 1/2 (I - Zi) or 1/2 (I + Zi). If User want 
+        generate the circuit from this class, then they must leave pwr_args=True (default) value. This function also generates 
+        quantCir_list to be used for circuit generation.
+
+        Parameters
+        ----------
+        pwr_args : bool, optional
+            Set to False if users want to keep the Pauli Expression that has powers > 1; however in a quantum circuit it does not matter
+        boolean : bool, optional
+            If the objective function is a boolean expression set this to True else an error will be raised by SymPy
+        """
+
         if boolean == True:
             self.Hamil_exp = simplify_logic(self.obj_exp)
             self.Hamil_exp = self.Hamil_exp.replace(Or, Add)
@@ -201,8 +317,30 @@ class phase_hamiltonian(hamiltonian):
             
             self.quanCir_list = Poly(temp).monoms()
 
-    # multidimensional qubit mapping for problems involving k-dits
     def perDitMap(self, gamma, p, k_dits, graph: nx.Graph, sub_expr={'i': 'i'}, barrier=False, initial_Hadamard=False):
+        """ Experimental Function: maps the each variable/vertex to dits(multiple qubits) used for problems that require order and sequence.
+
+            Dit map functions allows users to map a single variable to multiple qubits, this function is used for problems like TSP. However,
+            the circuit generated in not optimized. 
+
+            Parameters
+            ----------
+            gamma : list
+                list of initial hyperparameters to generate the quantum circuit
+            p : int
+                number of p-steps 
+            graph : nx.Graph
+                a networkx graph that can be used to map the variables to k-dits
+            k_dits : int
+                number of qubit that each variable is mapped to
+            sub_expr : dict
+                expression that determines how the k-dits interact
+            barrier : boolean
+                set to True if a quantum barrier is to be added at the end of the circuit
+            initial_hadamard : boolean
+                If the circuit is to be set-up into equal superposition for all states.
+        """
+        
         assert p == len(gamma)
 
         self.quantum_circuit = []
@@ -228,8 +366,10 @@ class phase_hamiltonian(hamiltonian):
 
             self.quantum_circuit.append(cir)
 
-    # Map the qubits directly to each variable
     def perQubitMap(self, gamma:list, p, barrier=False, initial_Hadamard=False):
+        """
+        """
+
         assert p == len(gamma)
 
         self.quantum_circuit = []

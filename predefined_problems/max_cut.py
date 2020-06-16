@@ -60,7 +60,8 @@ class max_cut:
             self.circuit = self.phse_ham / self.mx_ham
     
     def run_circuit(self, shots=1024):
-        # Add backend for actual quantum chip
+        
+        # TODO: Add backend for actual quantum chip
         backend      = Aer.get_backend("qasm_simulator")
         print('backend setup: Complete running circuit')
 
