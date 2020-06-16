@@ -84,22 +84,18 @@ class max_cut:
         return -1 * res_maxcut
 
 
-    def run_QAOA(self, init_hyperparams:list, method:str):
-        #define the bounds for the hyperparameters
-        # bounds = [[0, 2*np.pi], [0, np.pi]]
-        # cons = []
-        # for factor in range(len(bounds)):
-        #     lower, upper = bounds[factor]
-        #     l = {'type': 'ineq',
-        #         'fun': lambda x, lb=lower, i=factor: x[i] - lb}
-        #     u = {'type': 'ineq',
-        #         'fun': lambda x, ub=upper, i=factor: ub - x[i]}
-        #     cons.append(l)
-        #     cons.append(u)
+    def run_QAOA(self, opt_function, **kwargs):
         
-        res = opt.minimize(self.MAX_CUT, init_hyperparams, tol= 1e-3, method=method)
+        res = opt_function(self.MAX_CUT, **kwargs)
 
-        print(res)
+        opt_hyperparameter = res.x
 
-        return res.x        
+        self.generate_quantumCircuit(self.graph,  opt_hyperparameter)
+
+        backend = Aer.get_backend("qasm_simulator")
+        simulate     = execute(self.circuit, backend=backend, shots=self.shots)
+        results = simulate.result()
+        res_maxcut = self.expectation.get_expectationValue(results,self.shots,self.graph)
+
+        return {'expectation': res_maxcut, 'optimal_parameters': opt_hyperparameter, 'QPU_data':results , 'optimizer_data': res }
 

@@ -101,21 +101,10 @@ class skeletor:
         return -1 * res_maxcut
 
         
-    def run_QAOA(self, init_hyperparams: list, method: str):
-        # define the bounds for the hyperparameters
-        # bounds = [[0, 2*np.pi], [0, np.pi]]
-        # cons = []
-        # for factor in range(len(bounds)):
-        #     lower, upper = bounds[factor]
-        #     l = {'type': 'ineq',
-        #          'fun': lambda x, lb=lower, i=factor: x[i] - lb}
-        #     u = {'type': 'ineq',
-        #          'fun': lambda x, ub=upper, i=factor: ub - x[i]}
-        #     cons.append(l)
-        #     cons.append(u)
+    def run_QAOA(self, opt_function, **kwargs):
+        res = opt_function(self.run_skeletor, **kwargs)
 
-        res = opt.minimize(self.run_skeletor, init_hyperparams, tol=1e-3, method=method)
+        #print(res)
 
-        print(res)
+        return res.x  
 
-        return res.x
