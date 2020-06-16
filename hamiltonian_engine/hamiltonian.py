@@ -367,7 +367,20 @@ class phase_hamiltonian(hamiltonian):
             self.quantum_circuit.append(cir)
 
     def perQubitMap(self, gamma:list, p, barrier=False, initial_Hadamard=False):
-        """
+        """ Maps each variable to a single qubit 
+
+            perQubitMap function can be used for QUBO functions or algorithms that do not involve a graph.
+
+            Parameters
+            ----------
+            gamma : list
+                list of initial hyperparameters to initialize the circuit
+            p : int
+                number of p-steps
+            barrier : boolean
+                set to True if there is to be a quantum barrier added at the end of the circuit
+            initial_hadamard : boolean
+                If the circuit is to be set-up into equal superposition
         """
 
         assert p == len(gamma)
@@ -394,6 +407,9 @@ class phase_hamiltonian(hamiltonian):
 
     # Only for 2 variable Expressions since each edge is an interaction between 2 vertices(qubits)
     def perEdgeMap(self, gamma:list, p:int, graph:nx.Graph,  barrier=False, initial_Hadamard=False):
+        """
+        """
+
         assert p == len(gamma) 
 
         self.__add_defaultWeights(graph)
@@ -500,7 +516,7 @@ class mixer_hamiltonian(hamiltonian):
 
             self.quantum_circuit.append(cir)
 
-
+    # Do not uncomment until you are ready for crazy!
     # def single_XYMixer(self, xy: str, beta: float, qubit_1: int, qubit_2: int, ancillary_qubit: int = None):
     #     if qubit_1 == qubit_2:
     #         raise ValueError(
