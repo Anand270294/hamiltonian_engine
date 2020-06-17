@@ -288,12 +288,12 @@ class phase_hamiltonian(hamiltonian):
         self.Hamil_exp = self.Hamil_exp.replace(
             lambda expr: expr.is_Pow and (expr.count(I) > 0), lambda expr: expr.base**1)
 
-        # # Remove all Identity matrices and global phases
+        #  Remove all Identity matrices that multipled with Pauli Z operators
         for sym in self.obj_exp.free_symbols:
             self.Hamil_exp = self.Hamil_exp.subs(self.Z[sym]* I, self.Z[sym])
         # coeff = self.Hamil_exp.as_coefficients_dict()
 
-        # # Reduce variables with >= power(1) to power(1)
+        #  Reduce variables with >= power(1) to power(1)
         if pwr_args == True:
             self.Hamil_exp = self.Hamil_exp.replace(
                 lambda expr: expr.is_Pow, lambda expr: expr.base**1)
@@ -407,7 +407,25 @@ class phase_hamiltonian(hamiltonian):
 
     # Only for 2 variable Expressions since each edge is an interaction between 2 vertices(qubits)
     def perEdgeMap(self, gamma:list, p:int, graph:nx.Graph,  barrier=False, initial_Hadamard=False):
-        """
+        """ Maps the qubits based on the graph and the hamiltonian generated.
+
+            User have to be cautious that the hamiltonian generated only has 2 variables since this functions maps on an edge-edge basis, 
+            which also allows for single Z gate per vertex for problems that are based on the vertices i.e max independent set. This function also 
+            generates the full hamiltonian of the graph for all egde interaction ZZ Pauli expression which can useful for users who wish to use
+            Tensorflow Quantum to find the optimal Hypeparameters.
+
+            Parameters
+            ----------
+            gamma : list 
+                list of gamma hyperparameters for the Pauli ZZ expression
+            p : int
+                number of p-steps
+            graph : networkx graph 
+                Graph is used to map the qubits
+            barrier : boolean
+                set to True if there is to be a quantum barrier added at the end of the circuit
+            initial_hadamard : boolean
+                If the circuit is to be set-up into equal superposition
         """
 
         assert p == len(gamma) 
@@ -465,11 +483,39 @@ class phase_hamiltonian(hamiltonian):
 
 
 class mixer_hamiltonian(hamiltonian):
+    """
+    Child class of hamiltonian, mixer hamiltonian generates the mixer/reference quantum circuits, however, it does not generate the Pauli expression.
+    Users use this class to instantiate the class.
+
+    Methods
+    -------
+    generalXMixer( betas:list, p:int, qubit_map:dict, measure=False)
+        maps the each variable/vertex with RX gate
+    
+    controlledXMixer(beta:list, p:int, graph: nx.Graph, inverse:bool= False, measure=False)
+        maps each vertex to controlled RX gates based on the neigbouring vertices.
+    """
+
     def __init__(self, var=None, expr_str=None):
         super().__init__(expr_str, var)
 
-    # Mixer Hamiltonian for qubits to have dynamicity between {0,1}
     def generalXMixer(self, betas:list, p:int, qubit_map:dict, measure=False):
+        """ Maps each of the variables/vertices to single RX gate to allow non-trivial dynamicity to the qubit states
+
+            generalXmixer function is trivial to implement based on the number of qubits present. Users are also given 
+            an option to measure all of the qubit values if they wish to run the circuit on a simulator/QPU.
+
+            Parameters
+            ----------
+            betas : list
+                list of betas to be used as rotation angles
+            p : int
+                number of p-steps
+            qubit_map : dict
+                dict of how each qubit is mapped, can be obtained from phase_hamiltonian object
+            measure : boolean
+                If the circuit is to be measured at the end
+        """
 
         self.quantum_circuit = []
 
@@ -484,9 +530,28 @@ class mixer_hamiltonian(hamiltonian):
             self.quantum_circuit.append(cir)
 
 
-    def controlledXMixer(self, beta:list, p:int, graph: nx.Graph, inverse:bool= False, measure=False):
-        # allow for ancillary qubits so that controlled rotations can be performed.
-        # Include the controlled X-not version by adding X gates to each side of the controlled qubit line.
+    def controlledXMixer(self, betas:list, p:int, graph: nx.Graph, inverse:bool= False, measure=False):
+        """ maps each vertex to controlled RX gates based on the neigbouring vertices.
+
+            controlledXMixer function uses Breath First Search to find the neighbouring vertices as the control qubits for RX gate.
+            User must be cautious with regards to the degree of each vertex, if the degree is too high > 3 the gate count of the circuit 
+            will be very high which may lead to higher errors in the results especially if the circuit is run on an actual QPU. Users are
+            also provided with an option to invert the controll qubits.
+
+            Parameters
+            ----------
+            betas : list 
+                list of betas to be used as rotation angles
+            p : int
+                number of p-steps
+            graph : networkx graph
+                networkx graph to be used to find neighbouring vertices
+            inverse : boolean
+                Option to invert the control qubits and invert back after the rotation
+            measure : boolean
+                If the circuit is to be measured at the end
+        """
+
         self.quantum_circuit = []
 
         for i in range(p):

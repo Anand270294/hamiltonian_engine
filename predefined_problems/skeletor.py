@@ -1,9 +1,7 @@
 import networkx as nx
-import numpy as np
-from qiskit.visualization import plot_histogram
 from qiskit import *
-from scipy.optimize import Bounds
-from scipy import optimize as opt
+from qiskit.tools.monitor import job_monitor
+
 import os
 os.path.abspath(os.curdir)
 os.path.sys.path.append('../hamiltonian_engine/')
@@ -19,8 +17,8 @@ class skeletor:
     graph = None
     shots = 0
 
-    def __init__(self, p: int, obj_fun: str, variables: list, boolean: bool, shots=1024, graph: nx.Graph = None):
-        self.shots = shots
+    def __init__(self, p: int, obj_fun: str, variables: list, boolean: bool, graph: nx.Graph = None):
+        # self.shots = shots
         self.graph = graph
         self.p = p
         self.objective_function = obj_fun
@@ -48,7 +46,11 @@ class skeletor:
 
     def set_upMixerHamiltonian(self, func, inverse=None):
         self.mx_function = (func, inverse)
-        
+    
+    def setup_device(self, run_function, function_args:dict):
+        self.qpu_execution = run_function
+        self.qpu_args = function_args
+
     def generate_quantumCircuit(self, hyperparams: list):
         assert len(hyperparams) == 2*self.p
 
@@ -74,37 +76,46 @@ class skeletor:
 
         return self.circuit.draw(output='mpl')
 
-    def run_circuit(self, shots=1024):
-        # Add backend for actual quantum chip
-        backend = Aer.get_backend("qasm_simulator")
-        print('backend setup: Complete running circuit')
+    def run_circuit(self):
 
-        simulate = execute(self.circuit, backend=backend, shots=shots)
-        results = simulate.result()
+        job = self.qpu_execution(self.circuit, **self.qpu_args)
 
-        print('Simulation: Complete!')
+        job_monitor(job, quiet=True)
 
-        print("Expectation Value : {}".format(
-            self.expectation.get_expectationValue(results, shots, self.graph)))
+        results = job.result()
+
+        print('Run Complete! job_id : {}'.format(job.job_id()))
+
+        print("Expectation Value : {}".format(self.expectation.get_expectationValue(results, self.qpu_args['shots'], self.graph)))
 
         return results
 
     def run_skeletor(self, hyperparameters: list):
+        
         self.generate_quantumCircuit(hyperparameters)
 
-        backend = Aer.get_backend("qasm_simulator")
-        simulate = execute(self.circuit, backend=backend, shots=self.shots)
-        results = simulate.result()
-        res_maxcut = self.expectation.get_expectationValue(
-            results, self.shots, self.graph)
+        job = self.qpu_execution(self.circuit, **self.qpu_args)
+
+        job_monitor(job, quiet=True)
+
+        results = job.result()
+
+        res_maxcut = self.expectation.get_expectationValue(results, self.qpu_args['shots'], self.graph)
 
         return -1 * res_maxcut
 
         
     def run_QAOA(self, opt_function, **kwargs):
+
         res = opt_function(self.run_skeletor, **kwargs)
 
-        #print(res)
+        opt_hyperparameter = res.x
 
-        return res.x  
+        self.generate_quantumCircuit(opt_hyperparameter)
+
+        results = self.run_circuit()
+
+        res_maxcut = self.expectation.get_expectationValue(results,self.qpu_args['shots'],self.graph)
+
+        return {'expectation': res_maxcut, 'optimal_parameters': opt_hyperparameter, 'QPU_data':results , 'optimizer_data': res }
 

@@ -4,11 +4,8 @@ from hamiltonian import phase_hamiltonian as phs_ham
 from hamiltonian import mixer_hamiltonian as mix_ham
 from expectation_value import expectation_value as ex_v
 
-from scipy import optimize as opt
-from scipy.optimize import Bounds
 from qiskit import *
-from qiskit.visualization import plot_histogram
-import numpy as np
+from qiskit.tools.monitor import job_monitor
 import networkx as nx
 
 # TODO: Change class to MAX-CUT then add different sub-class types
@@ -21,8 +18,8 @@ class max_cut:
     shots = 0
     
 
-    def __init__(self, p:int, graph:nx.Graph, shots=1024, directed=False):
-        self.shots = shots
+    def __init__(self, p:int, graph:nx.Graph, directed=False):
+        # self.shots = shots
         self.graph = graph
         self.directed = directed
         self.p = p
@@ -39,6 +36,10 @@ class max_cut:
 
         # generate Phase Hamiltonian
         self.phse_ham.Hamify(boolean=True)
+
+    def setup_device(self, run_function, function_args:dict):
+        self.qpu_execution = run_function
+        self.qpu_args = function_args
 
 
     def generate_quantumCircuit(self, graph:nx.Graph, hyperparams:list):
@@ -59,28 +60,31 @@ class max_cut:
 
             self.circuit = self.phse_ham / self.mx_ham
     
-    def run_circuit(self, shots=1024):
-        
-        # TODO: Add backend for actual quantum chip
-        backend      = Aer.get_backend("qasm_simulator")
-        print('backend setup: Complete running circuit')
+    def run_circuit(self):
 
-        simulate     = execute(self.circuit, backend=backend, shots=shots)
-        results = simulate.result()
+        job = self.qpu_execution(self.circuit, **self.qpu_args)
 
-        print('Simulation: Complete!')
+        job_monitor(job, quiet=True)
 
-        print("Expectation Value : {}".format(self.expectation.get_expectationValue(results,shots,self.graph)))
+        results = job.result()
+
+        print('Run Complete! job_id : {}'.format(job.job_id()))
+
+        print("Expectation Value : {}".format(self.expectation.get_expectationValue(results,self.qpu_args['shots'],self.graph)))
 
         return results
 
     def MAX_CUT(self, hyperparameters:list):
+        
         self.generate_quantumCircuit(self.graph, hyperparameters)
 
-        backend = Aer.get_backend("qasm_simulator")
-        simulate     = execute(self.circuit, backend=backend, shots=self.shots)
-        results = simulate.result()
-        res_maxcut = self.expectation.get_expectationValue(results,self.shots,self.graph)
+        job = self.qpu_execution(self.circuit, **self.qpu_args)
+
+        job_monitor(job, quiet=True)
+
+        results = job.result()
+
+        res_maxcut = self.expectation.get_expectationValue(results, self.qpu_args['shots'], self.graph)
 
         return -1 * res_maxcut
 
@@ -93,10 +97,9 @@ class max_cut:
 
         self.generate_quantumCircuit(self.graph,  opt_hyperparameter)
 
-        backend = Aer.get_backend("qasm_simulator")
-        simulate     = execute(self.circuit, backend=backend, shots=self.shots)
-        results = simulate.result()
-        res_maxcut = self.expectation.get_expectationValue(results,self.shots,self.graph)
+        results = self.run_circuit()
+
+        res_maxcut = self.expectation.get_expectationValue(results,self.qpu_args['shots'],self.graph)
 
         return {'expectation': res_maxcut, 'optimal_parameters': opt_hyperparameter, 'QPU_data':results , 'optimizer_data': res }
 

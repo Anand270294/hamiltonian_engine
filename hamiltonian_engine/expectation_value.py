@@ -38,10 +38,11 @@ class expectation_value:
 
         if self.is_graph == False:
             for bitstr in counts:
+                reverse_bitstr = bitstr[::-1]
                 temp_func = self.obj_exp
 
                 for sym in self.obj_exp.free_symbols:
-                    temp_func = temp_func.subs(sym, bitstr[self.qubit_map[str(sym)]])      
+                    temp_func = temp_func.subs(sym, reverse_bitstr[self.qubit_map[str(sym)]])      
 
                 expectation_value = expectation_value + (counts[bitstr] / shots) * temp_func
         else:
